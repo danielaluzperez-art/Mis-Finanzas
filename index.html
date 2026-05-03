@@ -192,7 +192,7 @@ function renderNuevo(root){
   const cs=mkSel(cfg.clsf,st.clasificacion,v=>st.clasificacion=v);
   fb.appendChild(fld("Clasificación",cs));
 
-  const ss=el("select",{style:"width:100%;padding:11px 12px;font-size:15px;font-family:inherit;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);outline:none;appearance:none"});
+  const ss=el("select",{});
   function refreshSubc(conc){
     ss.innerHTML="";
     (cfg.subc[conc]||[]).forEach(s=>{const o=el("option",{value:s},s);if(s===st.subconcepto)o.selected=true;ss.appendChild(o);});
@@ -348,9 +348,9 @@ function renderExportar(root){
   const c1=el("div",{class:"card"});
   c1.appendChild(el("div",{class:"ch"},"Exportar a Excel"));
   const info=el("div",{style:"margin:10px 16px;padding:12px;background:var(--bg);border-radius:var(--rs);font-size:13px;color:var(--text2);line-height:1.6"});
-  info.textContent="Genera un .xlsx con la hoja 'Base de datos' (11 columnas, mismo formato que tu planilla) y 'Gastos Mes' (tabla pivot por clasificación).";
+  info.textContent="Exporta un archivo .csv con las 11 columnas de tu planilla (compatible con Excel). Abrilo con Excel y copiá los datos a tu planilla.";
   c1.appendChild(info);
-  const btnX=el("button",{class:"btn btn-p",style:"margin:0 16px 16px;width:calc(100% - 32px)"},"⬇ Descargar .xlsx");
+  const btnX=el("button",{class:"btn btn-p",style:"margin:0 16px 16px;width:calc(100% - 32px)"},"⬇ Descargar .csv");
   btnX.disabled=gastos.length===0;
   btnX.addEventListener("click",doExport);
   c1.appendChild(btnX);
@@ -370,41 +370,25 @@ function renderExportar(root){
   root.appendChild(c3);
 }
 
+function csvEscape(v){
+  const s=String(v==null?"":v);
+  return s.includes(",")||s.includes('"')||s.includes("\n")? '"'+s.replace(/"/g,'""')+'"' : s;
+}
 function doExport(){
-  if(typeof XLSX==="undefined"){
-    showToast("⏳ Cargando librería, esperá...",3000);
-    const s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-    s.onload=()=>{showToast("Listo! Tocá Descargar de nuevo");};
-    s.onerror=()=>{showToast("⚠ Sin conexión, conectate a internet e intentá de nuevo");};
-    document.head.appendChild(s);
-    return;
-  }
   try{
-    const wb=XLSX.utils.book_new();
     const hdrs=["Año","Mes Cash Out","Clasificacion","Concepto","Subconcepto","Detalle","Monto","Origen","Gasto x","Fecha Gasto","Observaciones"];
     const rows=gastos.map(g=>[g.anio,g.mes,g.clasificacion,g.concepto,g.subconcepto,g.detalle,g.monto,g.origen,g.gastox,g.fecha,g.observaciones||""]);
-    const ws1=XLSX.utils.aoa_to_sheet([hdrs,...rows]);
-    ws1["!cols"]=[{wch:6},{wch:12},{wch:22},{wch:18},{wch:18},{wch:30},{wch:14},{wch:18},{wch:20},{wch:12},{wch:25}];
-    XLSX.utils.book_append_sheet(wb,ws1,"Base de datos");
-
-    const allS=[...new Set(gastos.map(g=>g.subconcepto))].sort();
-    const ph=["Subconcepto",...cfg.clsf,"Grand Total"];
-    const pr=allS.map(s=>[s,...cfg.clsf.map(c=>gastos.filter(g=>g.subconcepto===s&&g.clasificacion===c).reduce((a,b)=>a+b.monto,0)),gastos.filter(g=>g.subconcepto===s).reduce((a,b)=>a+b.monto,0)]);
-    const tr2=["Grand Total",...cfg.clsf.map(c=>gastos.filter(g=>g.clasificacion===c).reduce((a,b)=>a+b.monto,0)),gastos.reduce((a,b)=>a+b.monto,0)];
-    const ws2=XLSX.utils.aoa_to_sheet([ph,...pr,tr2]);
-    XLSX.utils.book_append_sheet(wb,ws2,"Gastos Mes");
-
-    const fecha=new Date().toISOString().slice(0,10);
-    const wbout=XLSX.write(wb,{bookType:"xlsx",type:"array"});
-    const blob=new Blob([wbout],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    const csvLines=[hdrs,...rows].map(r=>r.map(csvEscape).join(",")).join("\r\n");
+    const bom="\uFEFF";
+    const blob=new Blob([bom+csvLines],{type:"text/csv;charset=utf-8"});
     const url=URL.createObjectURL(blob);
+    const fecha=new Date().toISOString().slice(0,10);
     const a=document.createElement("a");
-    a.href=url;a.download="Gastos_"+fecha+".xlsx";
+    a.href=url;a.download="Gastos_"+fecha+".csv";
     document.body.appendChild(a);a.click();
     setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},1500);
-    showToast("✓ Archivo descargado");
-  }catch(e){showToast("Error al exportar: "+e.message);}
+    showToast("✓ CSV descargado — abrilo con Excel");
+  }catch(e){showToast("Error: "+e.message);}
 }
 
 /* ── CONFIG ── */
@@ -497,10 +481,6 @@ if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(
 
 /* ── BOOT ── */
 loadAll();
-// Precargar XLSX
-const xlsxScript=document.createElement("script");
-xlsxScript.src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-document.head.appendChild(xlsxScript);
 render();
 </script>
 </body>
