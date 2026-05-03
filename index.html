@@ -672,7 +672,13 @@ function exportExcel() {
   XLSX.utils.book_append_sheet(wb,ws2,"Gastos Mes");
 
   const fecha=new Date().toISOString().slice(0,10);
-  XLSX.writeFile(wb,"Gastos_"+fecha+".xlsx");
+  const wbout=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+  const blob=new Blob([wbout],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="Gastos_"+fecha+".xlsx";
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
   showToast("✓ Archivo descargado");
 }
 
