@@ -153,7 +153,7 @@ function el(tag,attrs,...ch){
     else if(k.startsWith("on"))e.addEventListener(k.slice(2).toLowerCase(),v);
     else e.setAttribute(k,v);
   }
-  for(const c of ch.flat()){if(c==null)continue;e.appendChild(typeof c==="string"?document.createTextNode(c):c);}
+  for(const c of ch.flat()){if(c==null)continue;e.appendChild(c instanceof Node?c:document.createTextNode(String(c)));}
   return e;
 }
 function mkSel(opts,val,onChange,labelFn){
